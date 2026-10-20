@@ -6,6 +6,7 @@
  * one of the lists below has changed.
  */
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
 /**
  * Which of the Forest Nature Pack's 105 models to keep.
@@ -32,6 +33,10 @@ const STEPS = [
   ['tools/build-nature.mjs', 'assets-src/kenney_nature-kit/Models/GLTF format', 'public/assets/nature.glb'],
   ['tools/build-crew.mjs'],
 ]
+
+// No source packs means nothing to pack — and the packers' imports pull in sharp's native
+// binary, which can fail to load (e.g. blocked by Windows application control) for no gain.
+if (!existsSync('assets-src')) process.exit(0)
 
 for (const [script, ...args] of STEPS) {
   const run = spawnSync(process.execPath, [script, ...args], { stdio: 'inherit' })
