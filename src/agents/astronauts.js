@@ -1577,7 +1577,7 @@ export class Astronauts {
    * Pick the whole animated body and its badge. Distances are measured to their visible
    * extent, so a foot is as selectable as a helmet at close or distant zoom.
    */
-  pick(camera, ndcX, ndcY, aspect, maxDist = 0.075) {
+  pick(camera, ndcX, ndcY, aspect, maxDist = 0.1) {
     let best = null
     let bestScore = Infinity
     const v = this._v

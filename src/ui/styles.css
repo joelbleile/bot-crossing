@@ -596,9 +596,10 @@ body {
 }
 
 .thread-pop .avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 2px var(--ring, transparent);
   flex: none;
   display: grid;
   place-items: center;
@@ -628,6 +629,16 @@ body {
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.thread-pop .summary {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+  overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

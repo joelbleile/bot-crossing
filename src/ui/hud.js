@@ -74,6 +74,11 @@ export class Hud {
 
     this._buildStats()
     this._buildSettings()
+    // "12m ago" has to keep counting while a card stays open, not freeze at the moment of the click.
+    setInterval(() => {
+      const el = this.selected && this.$('.thread-pop .ago')
+      if (el) el.textContent = ago(this.selected.thread.lastActivityAt)
+    }, 15000)
     this._buildAvatar()
     this._wire()
     this.syncSettings()
@@ -730,7 +735,17 @@ export class Hud {
     // On a phone the card docks above the sheet's peek, so the sheet drops to make room.
     if (this.isPhone()) this.toggleSheet(false)
 
-    this.$('.thread-pop .title').textContent = thread.title || 'Untitled thread'
+    // The heading is the project; the line under it is what the chat is about.
+    this.$('.thread-pop .title').textContent = thread.project || 'Unknown project'
+    const summary = [thread.title, thread.preview].find((s) => s && s !== 'Untitled thread') || 'New conversation'
+    this.$('.thread-pop .summary').textContent = summary
+    // Every bot gets its own colour, fixed by its thread, so the same one is recognisable on sight.
+    const hue = hueOf(thread.id)
+    this.$('.thread-pop .avatar').style.setProperty('--ring', `hsl(${hue} 70% 62%)`)
+    if (this._avatarHue !== hue) {
+      this._avatarHue = hue
+      this._avatarState = { frame: -1, color: '' }
+    }
     const status = STATUS_LABEL[agent.status] || agent.status
     const meta = this.$('.thread-pop .meta')
     const bits = [
@@ -742,12 +757,9 @@ export class Hud {
     if (thread.worktree) bits.push(`<span class="tag">⑂ ${escapeHtml(thread.worktree)}</span>`)
     if (thread.gitBranch) bits.push(`<span class="tag">${escapeHtml(thread.gitBranch)}</span>`)
     if (thread.model) bits.push(`<span class="tag">${escapeHtml(shortModel(thread.model))}</span>`)
-    bits.push(`<span>${ago(thread.lastActivityAt)}</span>`)
+    bits.push(`<span class="ago">${ago(thread.lastActivityAt)}</span>`)
     meta.innerHTML = bits.join('')
 
-    const pct = Math.round((this.actions.progressFor?.(thread.id) ?? 0) * 100)
-    this.$('.thread-pop .progress > i').style.width = `${pct}%`
-    this.$('.thread-pop .progress > i').style.background = hex(agent.trim.getHex())
     // Measured once per selection rather than per frame: placing the card beside its
     // astronaut needs its size sixty times a second, and asking the layout for it that
     // often is how a HUD starts costing frames.
@@ -875,7 +887,11 @@ export class Hud {
     t.globalCompositeOperation = 'source-over'
 
     const c = this.avatarCtx
-    c.fillStyle = '#06070c'
+    const hue = this._avatarHue ?? 200
+    const bg = c.createRadialGradient(size * 0.5, size * 0.4, 4, size * 0.5, size * 0.5, size * 0.75)
+    bg.addColorStop(0, `hsl(${hue} 55% 26%)`)
+    bg.addColorStop(1, `hsl(${hue} 45% 8%)`)
+    c.fillStyle = bg
     c.fillRect(0, 0, size, size)
     c.drawImage(this.avatarTmp, 0, 0)
     // Scanlines, so the card's face reads as the same little screen as the one in the world.
@@ -1086,6 +1102,13 @@ function nearestTime(value) {
   return bestD < 0.03 ? best.id : null
 }
 
+/** A stable hue from a thread id, so each bot keeps its own colour. */
+function hueOf(id = '') {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return h % 360
+}
+
 function ago(ts) {
   if (!ts) return 'never'
   const s = Math.max(0, (Date.now() - ts) / 1000)
@@ -1166,12 +1189,12 @@ const TEMPLATE = `
     <div class="avatar"><canvas></canvas></div>
     <div class="info">
       <div class="title"></div>
+      <div class="summary"></div>
       <div class="meta"></div>
     </div>
     <button class="btn icon ghost" id="btn-follow" title="Follow selected bot" aria-label="Follow selected bot" aria-pressed="false">${ICON.locate}</button>
     <button class="btn icon ghost" id="btn-deselect" title="Deselect (Esc)">${ICON.close}</button>
   </div>
-  <div class="progress"><i></i></div>
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
     <button class="btn" id="btn-viewed" title="Stop this thread asking for you until it moves on again (V)">${ICON.eye} Viewed</button>
