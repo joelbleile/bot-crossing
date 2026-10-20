@@ -529,7 +529,14 @@ const GRADE_SHADER = {
     varying vec2 vUv;
     void main() {
       vec4 c = texture2D( tDiffuse, vUv );
-      vec3 col = c.rgb;
+      // Unsharp mask: push each pixel away from its four neighbours' average. Clamped to the
+      // neighbourhood's own range so it adds crispness without halos around bright edges.
+      vec2 px = 1.0 / vec2( textureSize( tDiffuse, 0 ) );
+      vec3 n = texture2D( tDiffuse, vUv + vec2( px.x, 0.0 ) ).rgb + texture2D( tDiffuse, vUv - vec2( px.x, 0.0 ) ).rgb
+             + texture2D( tDiffuse, vUv + vec2( 0.0, px.y ) ).rgb + texture2D( tDiffuse, vUv - vec2( 0.0, px.y ) ).rgb;
+      vec3 lo = min( c.rgb, n * 0.25 );
+      vec3 hi = max( c.rgb, n * 0.25 );
+      vec3 col = clamp( c.rgb + ( c.rgb - n * 0.25 ) * 0.6, lo - 0.08, hi + 0.08 );
       // Lifted, tinted blacks.
       col += ( 1.0 - col ) * vec3( 0.035, 0.045, 0.075 ) * ( 1.0 - smoothstep( 0.0, 0.5, dot( col, vec3( 0.333 ) ) ) );
       float l = dot( col, vec3( 0.2126, 0.7152, 0.0722 ) );
