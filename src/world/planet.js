@@ -37,8 +37,8 @@ export const PLANETS = {
     horizon: 0x14141c,
     sky: { top: 0x05060c, bottom: 0x101018 },
     fog: { color: 0x07080e, near: 170, far: 360 },
-    sun: { color: 0xfff4e2, intensity: 3.0, night: 0.05 },
-    ambient: { sky: 0x4a5878, ground: 0x5a5248, intensity: 0.95 },
+    sun: { color: 0xfff4e2, intensity: 2.6, night: 0.05 },
+    ambient: { sky: 0x3a4258, ground: 0x4a423a, intensity: 0.7 },
     // No atmosphere: shadows stay black and the stars never wash out.
     atmosphere: 0,
     craters: 26,
@@ -562,6 +562,56 @@ export const SKY_MAX_CELLS = 96
  * displacement map sample, no per-frame work — and vertex colours give the surface its
  * mottling for free rather than costing a texture fetch.
  */
+/**
+ * Fine ground detail, drawn in the fragment shader so it costs no geometry: three octaves of
+ * grain tint the colour, and the same noise nudges the surface normal, so light picks out
+ * gravel and ripples. Each octave fades out as it shrinks below a pixel — without that the
+ * finest grain shimmers on distant ground instead of settling into a flat tone.
+ */
+function groundDetail(shader) {
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', ['#include <common>', 'varying vec2 vGXZ;'].join('\n'))
+    .replace('#include <begin_vertex>', ['#include <begin_vertex>', 'vGXZ = transformed.xz;'].join('\n'))
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      '#include <common>',
+      `#include <common>
+       varying vec2 vGXZ;
+       float gdHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+       float gdNoise( vec2 p ) {
+         vec2 i = floor( p ); vec2 f = fract( p ); f = f * f * ( 3.0 - 2.0 * f );
+         return mix( mix( gdHash( i ), gdHash( i + vec2( 1.0, 0.0 ) ), f.x ), mix( gdHash( i + vec2( 0.0, 1.0 ) ), gdHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y );
+       }
+       vec3 gdPerturb( vec3 pos, vec3 n, vec2 dH, float faceDir ) {
+         vec3 sx = normalize( dFdx( pos ) );
+         vec3 sy = normalize( dFdy( pos ) );
+         vec3 r1 = cross( sy, n );
+         vec3 r2 = cross( n, sx );
+         float det = dot( sx, r1 ) * faceDir;
+         vec3 grad = sign( det ) * ( dH.x * r1 + dH.y * r2 );
+         return normalize( abs( det ) * n - grad );
+       }`
+    )
+    .replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+       float gdPx = length( fwidth( vGXZ ) );
+       // Soft, rotated octaves: broad tonal patches, then a fine regolith grain that fades out
+       // before it gets smaller than a pixel so distant ground settles to a calm, even tone.
+       mat2 gdR = mat2( 0.8, -0.6, 0.6, 0.8 );
+       float gdPatch = gdNoise( gdR * vGXZ * 0.22 ) * 0.6 + gdNoise( gdR * gdR * vGXZ * 0.7 ) * 0.4;
+       float gdFine = 1.0 - smoothstep( 0.15, 0.55, gdPx * 11.0 );
+       float gdGrain = gdNoise( gdR * vGXZ * 11.0 ) * gdFine;
+       float gdBump = gdNoise( gdR * gdR * vGXZ * 2.4 ) * 0.65 + gdGrain * 0.35;
+       diffuseColor.rgb *= 0.94 + ( gdPatch - 0.5 ) * 0.26 + ( gdGrain - 0.5 * gdFine ) * 0.1;`
+    )
+    .replace(
+      '#include <normal_fragment_maps>',
+      `#include <normal_fragment_maps>
+       normal = gdPerturb( -vViewPosition, normal, vec2( dFdx( gdBump ), dFdy( gdBump ) ) * 0.35, faceDirection );`
+    )
+}
+
 export function createTerrain(planet, detail, seed = 1337) {
   const segments = DETAIL_SEGMENTS[detail] || DETAIL_SEGMENTS.medium
   const geo = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE, segments, segments)
@@ -625,6 +675,12 @@ export function createTerrain(planet, detail, seed = 1337) {
     // is what sells "dust" rather than "plastic".
     envMapIntensity: 0.3,
   })
+  // Our own onBeforeCompile replaces the prototype's, so the world bend has to be asked for here.
+  mat.onBeforeCompile = (shader) => {
+    withCurve(shader)
+    groundDetail(shader)
+  }
+  mat.customProgramCacheKey = () => 'bc-terrain-detail'
   const mesh = new THREE.Mesh(geo, mat)
   mesh.receiveShadow = true
   mesh.name = 'terrain'
@@ -639,6 +695,7 @@ export function createTerrain(planet, detail, seed = 1337) {
     const uniforms = { uSkyCells: cells, uSkyCellCount: { value: 0 }, uSkyReach: { value: 8 } }
     mat.onBeforeCompile = (shader) => {
       withCurve(shader)
+      groundDetail(shader)
       Object.assign(shader.uniforms, uniforms)
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\n varying vec2 vSkyXZ;')
@@ -673,7 +730,7 @@ export function createTerrain(planet, detail, seed = 1337) {
            }`
         )
     }
-    mat.customProgramCacheKey = () => 'bc-terrain-sky'
+    mat.customProgramCacheKey = () => 'bc-terrain-sky-detail'
     mesh.userData.setFootprint = (list, reach) => {
       const n = Math.min(list.length, SKY_MAX_CELLS)
       for (let i = 0; i < SKY_MAX_CELLS; i++) {

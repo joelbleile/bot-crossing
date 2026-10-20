@@ -162,7 +162,7 @@ const DEFAULTS = {
   dayLength: 240, // seconds for a full cycle when autoTime is on
 
   // Look
-  exposure: 1.12,
+  exposure: 1.0,
   bloomStrength: 0.25,
   tiltShiftStrength: 0.08, // 0..1 — share of the effect's full blur radius (2% of frame height)
   tiltShiftAngle: 0, // degrees — 0 keeps the sharp band horizontal

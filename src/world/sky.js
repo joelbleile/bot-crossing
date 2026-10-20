@@ -34,6 +34,32 @@ const SKY_FRAG = /* glsl */ `
   uniform vec3 uCloudColor;
   uniform float uCloudTime;
   uniform float uDay;
+  uniform float uSpace;      // 0 under a thick sky, 1 where there is nothing between you and the stars
+
+  float spHash( vec3 p ) {
+    p = fract( p * 0.3183099 + 0.1 );
+    p *= 17.0;
+    return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) );
+  }
+  float spNoise( vec3 x ) {
+    vec3 i = floor( x );
+    vec3 f = fract( x );
+    f = f * f * ( 3.0 - 2.0 * f );
+    return mix(
+      mix( mix( spHash( i ), spHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( spHash( i + vec3( 0, 1, 0 ) ), spHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
+      mix( mix( spHash( i + vec3( 0, 0, 1 ) ), spHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( spHash( i + vec3( 0, 1, 1 ) ), spHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ),
+      f.z );
+  }
+  float spFbm( vec3 p ) {
+    float s = 0.0;
+    float a = 0.5;
+    for ( int i = 0; i < 5; i++ ) {
+      s += spNoise( p ) * a;
+      p = p * 2.07 + vec3( 3.1, 7.7, 1.3 );
+      a *= 0.5;
+    }
+    return s;
+  }
 
   // Value noise on a hashed lattice — the same idea as the terrain's, on the GPU.
   float cloudHash( vec2 p ) {
@@ -93,6 +119,69 @@ const SKY_FRAG = /* glsl */ `
       // Clouds near the horizon fade into the haze rather than stacking into a wall.
       cover *= smoothstep( 0.025, 0.11, d.y );
       col = mix( col, cloud, cover );
+    }
+
+    // Deep space: a tilted Milky Way with a dust lane, two soft nebulae, and a fine field of
+    // stars. Every term is kept well under the bloom threshold, so it glows rather than glares.
+    if ( uSpace > 0.001 ) {
+      vec3 axis = normalize( vec3( 0.7, 0.5, -0.7 ) );
+      float band = dot( d, axis );
+      float core = exp( -band * band / 0.06 );
+      float cloudy = spFbm( d * 3.2 );
+      float dust = smoothstep( 0.42, 0.78, spFbm( d * 5.5 + 11.0 ) );
+      vec3 galaxy = mix( vec3( 0.22, 0.26, 0.46 ), vec3( 0.62, 0.50, 0.42 ), smoothstep( 0.3, 0.9, spFbm( d * 1.4 ) ) );
+      vec3 space = galaxy * core * ( 0.25 + cloudy * 0.9 ) * ( 1.0 - dust * 0.65 ) * 0.3;
+      // Nebulae away from the band, in two cool tints.
+      float neb1 = smoothstep( 0.52, 0.85, spFbm( d * 1.7 + 4.0 ) );
+      float neb2 = smoothstep( 0.55, 0.9, spFbm( d * 2.1 + 19.0 ) );
+      space += vec3( 0.34, 0.12, 0.46 ) * neb1 * 0.09 + vec3( 0.08, 0.30, 0.42 ) * neb2 * 0.07;
+      // Stars: one jittered round point per cell of a 3D grid, sized from the pixel footprint so
+      // they stay crisp dots at any resolution instead of squares. Most are dim; a few blaze.
+      for ( int layer = 0; layer < 2; layer++ ) {
+        float S = layer == 0 ? 70.0 : 150.0;
+        vec3 g = d * S;
+        vec3 cell = floor( g ) + float( layer ) * 31.0;
+        vec3 f = g - floor( g );
+        vec3 jit = vec3( spHash( cell + 1.0 ), spHash( cell + 2.0 ), spHash( cell + 3.0 ) ) * 0.7 + 0.15;
+        float px = length( fwidth( g ) );
+        float rad = max( px * 1.3, 0.05 );
+        float dot2 = smoothstep( rad, 0.0, length( f - jit ) );
+        float present = step( layer == 0 ? 0.80 : 0.86, spHash( cell ) );
+        float bright = pow( spHash( cell + 9.1 ), 3.0 );
+        vec3 starCol = mix( vec3( 0.7, 0.8, 1.0 ), vec3( 1.0, 0.85, 0.65 ), spHash( cell + 3.7 ) );
+        space += starCol * dot2 * present * ( 0.4 + 1.2 * bright ) * ( layer == 0 ? 1.0 : 0.6 );
+      }
+      col += space * uSpace;
+
+      // Two far planets: a banded gas giant and a small grey world, both lit from one side so
+      // they read as crescents and half-discs against the dark.
+      vec3 pl = normalize( vec3( -0.62, -0.16, -0.77 ) );
+      float pr = 0.085;
+      float pd = dot( d, pl );
+      if ( pd > cos( pr * 1.5 ) ) {
+        vec3 tx = normalize( cross( vec3( 0.0, 1.0, 0.0 ), pl ) );
+        vec3 ty = cross( pl, tx );
+        vec2 q = vec2( dot( d, tx ), dot( d, ty ) ) / sin( pr );
+        float rr = dot( q, q );
+        float edge = 1.0 - smoothstep( 0.94, 1.0, rr );
+        vec3 n = tx * q.x + ty * q.y + pl * sqrt( max( 1.0 - rr, 0.0 ) );
+        float lit = smoothstep( -0.15, 0.7, dot( n, normalize( vec3( 0.7, 0.35, 0.45 ) ) ) );
+        float bands = 0.5 + 0.5 * sin( n.y * 15.0 + spFbm( n * 3.0 ) * 4.0 );
+        vec3 body = mix( vec3( 0.55, 0.34, 0.22 ), vec3( 0.86, 0.72, 0.52 ), bands );
+        col += body * lit * edge * 0.55 * uSpace;
+      }
+      vec3 p2 = normalize( vec3( 0.83, -0.12, -0.54 ) );
+      float r2 = 0.03;
+      float d2 = dot( d, p2 );
+      if ( d2 > cos( r2 * 1.5 ) ) {
+        vec3 tx2 = normalize( cross( vec3( 0.0, 1.0, 0.0 ), p2 ) );
+        vec3 ty2 = cross( p2, tx2 );
+        vec2 q2 = vec2( dot( d, tx2 ), dot( d, ty2 ) ) / sin( r2 );
+        float rr2 = dot( q2, q2 );
+        vec3 n2 = tx2 * q2.x + ty2 * q2.y + p2 * sqrt( max( 1.0 - rr2, 0.0 ) );
+        float lit2 = smoothstep( -0.1, 0.8, dot( n2, normalize( vec3( -0.5, 0.3, 0.6 ) ) ) );
+        col += vec3( 0.62, 0.64, 0.7 ) * ( 0.7 + 0.3 * spFbm( n2 * 6.0 ) ) * lit2 * ( 1.0 - smoothstep( 0.94, 1.0, rr2 ) ) * 0.5 * uSpace;
+      }
     }
 
     // Haze thickens toward the horizon, so an atmosphere planet gets a soft rim.
@@ -284,6 +373,7 @@ export class Sky {
       uCloudColor: { value: new THREE.Color(0xffffff) },
       uCloudTime: { value: 0 },
       uDay: { value: 1 },
+      uSpace: { value: 1 },
     }
     const mat = new THREE.ShaderMaterial({
       uniforms: this.domeUniforms,
@@ -547,11 +637,13 @@ export class Sky {
     this.domeUniforms.uSunDir.value.copy(this.sunDir)
     this.domeUniforms.uGlow.value = (0.3 + planet.atmosphere * 1.1) * Math.max(0.08, day)
     this.domeUniforms.uDay.value = day
+    // Airless worlds show the stars at noon too; with air they come out as the sun goes down.
+    this.domeUniforms.uSpace.value = Math.max(1 - planet.atmosphere, (1 - day) * (1 - planet.atmosphere * 0.5))
     // The disc fades out as it sets rather than snapping off at the horizon.
     this.domeUniforms.uDisc.value = 2.4 * THREE.MathUtils.smoothstep(this.sunDir.y, -0.06, 0.04)
 
     // Stars fade with the sky, and never appear at all on a thick-atmosphere daytime.
-    this.stars.material.uniforms.uOpacity.value = Math.pow(1 - day, 1.6) * (1 - planet.atmosphere * 0.35)
+    this.stars.material.uniforms.uOpacity.value = Math.max(Math.pow(1 - day, 1.6) * (1 - planet.atmosphere * 0.35), 1 - planet.atmosphere)
     this.stars.visible = this.settings.get('stars') && this.stars.material.uniforms.uOpacity.value > 0.01
 
     this.companionHalo.material.uniforms.uStrength.value = 0.35 + (1 - day) * 0.65
