@@ -88,6 +88,7 @@ export class Engine {
 
     this.composer = null
     this.bloomPass = null
+    this._msaa = settings.get('antialias') ? 4 : 0
     this.occlusionPass = null
     this.smaaPass = null
     this.tiltShift = null
@@ -162,6 +163,11 @@ export class Engine {
     this.camera.fov = s.get('fov')
     this.camera.updateProjectionMatrix()
 
+    // The sample count is fixed when a render target is made, so changing it means a new one.
+    const msaa = s.get('antialias') ? 4 : 0
+    if (this.composer && this._msaa !== msaa) this._disposeComposer()
+    this._msaa = msaa
+
     const wantsPost = this._wantsPost()
     if (wantsPost) this._ensureComposer()
     else this._disposeComposer()
@@ -198,7 +204,9 @@ export class Engine {
     const target = new THREE.WebGLRenderTarget(1, 1, {
       type: THREE.HalfFloatType, // HDR: values above 1 survive to the bloom pass
       colorSpace: THREE.LinearSRGBColorSpace,
-      samples: 0,
+      // Real multisampling on the scene itself: SMAA at the end of the chain only softens edges
+      // it can still see, and far-away rocks and thin robot limbs are exactly what it misses.
+      samples: this._msaa,
       depthBuffer: true,
       stencilBuffer: false,
       depthTexture,

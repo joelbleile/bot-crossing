@@ -36,7 +36,7 @@ export const PLANETS = {
     rock: 0x6d6a70,
     horizon: 0x14141c,
     sky: { top: 0x05060c, bottom: 0x101018 },
-    fog: { color: 0x07080e, near: 100, far: 235 },
+    fog: { color: 0x07080e, near: 170, far: 360 },
     sun: { color: 0xfff4e2, intensity: 3.0, night: 0.05 },
     ambient: { sky: 0x4a5878, ground: 0x5a5248, intensity: 0.95 },
     // No atmosphere: shadows stay black and the stars never wash out.

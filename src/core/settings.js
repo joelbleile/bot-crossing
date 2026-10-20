@@ -67,7 +67,7 @@ export const PRESETS = {
     label: 'Balanced',
     hint: 'the default — looks good, runs cool',
     values: {
-      renderScale: 1,
+      renderScale: 1.25,
       shadows: 'high',
       bloom: true,
       antialias: true,
@@ -78,7 +78,7 @@ export const PRESETS = {
       maxAgents: 90,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false,
       colorGrade: true,
       ambientOcclusion: 0.25,
       clouds: true,
@@ -100,7 +100,7 @@ export const PRESETS = {
       maxAgents: 140,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false,
       colorGrade: true,
       ambientOcclusion: 0.25,
       clouds: true,
@@ -122,7 +122,7 @@ export const PRESETS = {
       maxAgents: 200,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false,
       colorGrade: true,
       ambientOcclusion: 0.25,
       clouds: true,
@@ -198,6 +198,7 @@ const DEFAULTS = {
   /** Same trick for the sky following the real clock, and for the ambience bed being silent. */
   liveDefaultsOn: false,
   marsDefaultOn: false,
+  sharpDefaultOn: false,
   showFps: false,
   showLabels: true,
   reducedMotion: false,
@@ -250,6 +251,13 @@ export class Settings {
     if (!Object.hasOwn(stored, 'marsDefaultOn')) {
       this.values.planet = 'mars'
       this.values.marsDefaultOn = true
+    }
+    // The sharper look: multisampling on, no depth blur, a supersampled buffer on Balanced.
+    if (!Object.hasOwn(stored, 'sharpDefaultOn')) {
+      this.values.antialias = true
+      this.values.tiltShift = false
+      if (this.values.preset === 'balanced') this.values.renderScale = 1.25
+      this.values.sharpDefaultOn = true
     }
     this.listeners = new Set()
     this._saveTimer = 0
