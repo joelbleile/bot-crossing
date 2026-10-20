@@ -378,6 +378,14 @@ export class Engine {
   }
 
   _loop() {
+    // A colony does not need the monitor's full refresh rate, and drawing at 144 fps made this
+    // page eat most of a GPU that a game on the same machine wants. 144 and up means no cap.
+    const cap = this.settings.get('maxFps')
+    if (cap > 0 && cap < 144) {
+      const now = performance.now()
+      if (now - (this._lastFrameAt || 0) < 1000 / cap - 2) return
+      this._lastFrameAt = now
+    }
     this.timer.update()
     // The timer already zeroes the delta across a hidden tab; the clamp is the backstop for
     // an ordinary long frame, so one stalled frame never jumps the whole colony forward.

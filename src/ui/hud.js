@@ -161,6 +161,15 @@ export class Hud {
         (v) => `${Math.round(v * 100)}%`,
         '100% is your display’s own resolution, retina included.'
       ),
+      this._slider(
+        'Max FPS',
+        'maxFps',
+        20,
+        144,
+        2,
+        (v) => (v >= 144 ? 'No cap' : `${v} fps`),
+        'Caps how often the picture is redrawn. Lower leaves more of your graphics card for other things, like a game.'
+      ),
       this._toggle('Adaptive quality', 'autoQuality', 'Quietly drops render scale if frames get expensive.'),
       this._slider('Scatter', 'scatterDensity', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
       this._slider('Max bots', 'maxAgents', 10, 200, 10, (v) => String(v)),

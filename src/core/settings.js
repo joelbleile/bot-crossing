@@ -67,7 +67,7 @@ export const PRESETS = {
     label: 'Balanced',
     hint: 'the default — looks good, runs cool',
     values: {
-      renderScale: 1.25,
+      renderScale: 1,
       shadows: 'high',
       bloom: true,
       antialias: true,
@@ -188,6 +188,7 @@ const DEFAULTS = {
   musicVolume: 0.5,
 
   // Behaviour
+  maxFps: 60, // 144 means unlimited; a lower cap keeps the page from hogging the GPU
   autoQuality: true, // drop render scale when frames get expensive
   autoFrame: false, // ease the camera back to isometric when you stop dragging; opt-in
   // On by default: picking a bot is nearly always the start of watching it, and having to find
@@ -199,6 +200,7 @@ const DEFAULTS = {
   liveDefaultsOn: false,
   marsDefaultOn: false,
   sharpDefaultOn: false,
+  gpuKindOn: false,
   showFps: false,
   showLabels: true,
   reducedMotion: false,
@@ -258,6 +260,11 @@ export class Settings {
       this.values.tiltShift = false
       if (this.values.preset === 'balanced') this.values.renderScale = 1.25
       this.values.sharpDefaultOn = true
+    }
+    // 125% plus multisampling cost a 1080 Ti most of its power; native resolution is the default.
+    if (!Object.hasOwn(stored, 'gpuKindOn')) {
+      if (this.values.preset === 'balanced') this.values.renderScale = 1
+      this.values.gpuKindOn = true
     }
     this.listeners = new Set()
     this._saveTimer = 0
