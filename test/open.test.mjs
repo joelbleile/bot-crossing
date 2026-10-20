@@ -33,11 +33,12 @@ test('asked for a terminal, present never opens the app instead', async () => {
   assert.match((await present({ ok: true, url: '', command: gone }, 'terminal')).error, /not on this machine/)
 })
 
-test('asked for a terminal on Windows, present says so rather than trying', async () => {
-  const command = { argv: ['/bin/true'], cwd: os.tmpdir() }
+test('on Windows a terminal request is handled there, and a malformed command is refused before anything launches', async () => {
+  // Relative argv[0] is rejected up front, so nothing is ever spawned by this test.
+  const command = { argv: ['not-absolute'], cwd: os.tmpdir() }
   const shown = await withPlatform('win32', () => present({ ok: true, url: '', command }, 'terminal'))
   assert.equal(shown.ok, false)
-  assert.match(shown.error, /Windows/)
+  assert.match(shown.error, /Invalid launch command/)
 })
 
 test("an adapter's own refusal passes through whatever the page asked for", async () => {

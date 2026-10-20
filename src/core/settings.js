@@ -147,7 +147,7 @@ const DEFAULTS = {
   ...PRESETS.balanced.values,
 
   // World
-  planet: 'moon',
+  planet: 'mars',
   /**
    * Fold away repos where every thread has been quiet for three days. On by default: with
    * several harnesses read at once the map otherwise fills with every checkout you have ever
@@ -175,7 +175,7 @@ const DEFAULTS = {
    */
   worldCurve: 0.45,
   /** The colour grade on top of tone mapping: saturation, a warm cast, and a soft vignette. */
-  saturation: 1.08,
+  saturation: 1.15,
   vignette: 0.2,
 
   // Sound. On by default but silent until the first click — browsers insist — and every
@@ -197,6 +197,7 @@ const DEFAULTS = {
   followDefaultOn: false,
   /** Same trick for the sky following the real clock, and for the ambience bed being silent. */
   liveDefaultsOn: false,
+  marsDefaultOn: false,
   showFps: false,
   showLabels: true,
   reducedMotion: false,
@@ -245,6 +246,10 @@ export class Settings {
       this.values.ambienceVolume = 0
       this.values.planet = 'moon'
       this.values.liveDefaultsOn = true
+    }
+    if (!Object.hasOwn(stored, 'marsDefaultOn')) {
+      this.values.planet = 'mars'
+      this.values.marsDefaultOn = true
     }
     this.listeners = new Set()
     this._saveTimer = 0
