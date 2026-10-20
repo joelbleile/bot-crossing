@@ -122,28 +122,8 @@ export class Hud {
     )
 
     // Performance.
-    const perf = group('Performance')
+    const perf = group('Graphics')
     perf.append(
-      this._toggle('HDR + bloom', 'bloom', 'Glowing eyes, lamps and windows. The first thing to drop.'),
-      this._toggle('Tilt-shift', 'tiltShift', 'A shallow depth of field, which is what makes the colony read as a model.'),
-      this._slider(
-        'Tilt-shift blur',
-        'tiltShiftStrength',
-        0,
-        1,
-        0.05,
-        (v) => `${Math.round(v * 100)}%`,
-        'Aperture: how shallow the focus is, and how far out of it things go.'
-      ),
-      this._slider(
-        'Tilt-shift angle',
-        'tiltShiftAngle',
-        -90,
-        90,
-        1,
-        (v) => `${v}°`,
-        'Swings the plane of focus, the way tilting a real lens does.'
-      ),
       this._select('Shadows', 'shadows', [
         ['off', 'Off'],
         ['low', 'Low'],
@@ -166,7 +146,7 @@ export class Hud {
         ['medium', 'Medium'],
         ['high', 'High'],
       ]),
-      this._toggle('Anti-aliasing', 'antialias', 'SMAA pass. Cheap, but not free.'),
+      this._toggle('Anti-aliasing', 'antialias', 'SMAA pass: smooth edges. Cheap, but not free.'),
       this._slider(
         'Render scale',
         'renderScale',
@@ -278,6 +258,26 @@ export class Hud {
     // Look.
     const look = group('Look')
     look.append(
+      this._toggle('Depth blur (tilt-shift)', 'tiltShift', 'Blurs the edges of the frame so the colony reads as a model. Turn it off for a fully sharp picture.'),
+      this._slider(
+        'Blur amount',
+        'tiltShiftStrength',
+        0,
+        1,
+        0.05,
+        (v) => `${Math.round(v * 100)}%`,
+        'How shallow the focus is. Low is sharper.'
+      ),
+      this._slider(
+        'Blur angle',
+        'tiltShiftAngle',
+        -90,
+        90,
+        1,
+        (v) => `${v}°`,
+        'Swings the plane of focus, the way tilting a real lens does.'
+      ),
+      this._toggle('HDR + bloom', 'bloom', 'Glowing eyes, lamps and windows. The first thing to drop.'),
       this._slider(
         'Ambient occlusion',
         'ambientOcclusion',
@@ -317,10 +317,43 @@ export class Hud {
         'A bed for each world, things calling out on their own clocks, and work you can hear where it is happening. Louder as you lean in.'
       ),
       this._slider('Master', 'masterVolume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
+      this._slider('Music', 'musicVolume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`, 'A slow, soft tune that plays under the world.'),
       this._slider('Ambience', 'ambienceVolume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`, 'Beds and the sounds of the world.'),
       this._slider('Effects', 'effectsVolume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`, 'Hammering, drones, splashes, the chime when somebody needs you.')
     )
     body.appendChild(sound)
+
+    // One section at a time, behind tabs, instead of a single long scroll.
+    const TABS = [
+      ['quality', 'Quality', ['Quality preset', 'Graphics']],
+      ['world', 'World', ['Planet', 'Lighting']],
+      ['look', 'Look', ['Look']],
+      ['view', 'View', ['View']],
+      ['sound', 'Sound', ['Sound']],
+    ]
+    const tabs = document.createElement('div')
+    tabs.className = 'tabs'
+    tabs.setAttribute('role', 'tablist')
+    const show = (id) => {
+      body.dataset.tab = id
+      for (const b of tabs.children) b.setAttribute('aria-selected', String(b.dataset.tab === id))
+      body.scrollTop = 0
+    }
+    for (const [id, label, titles] of TABS) {
+      for (const g of body.querySelectorAll('.group')) {
+        if (titles.includes(g.querySelector('h3')?.textContent)) g.dataset.tab = id
+      }
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'tab'
+      b.dataset.tab = id
+      b.setAttribute('role', 'tab')
+      b.textContent = label
+      b.addEventListener('click', () => show(id))
+      tabs.appendChild(b)
+    }
+    body.before(tabs)
+    show('quality')
   }
 
   _row(label, hint) {

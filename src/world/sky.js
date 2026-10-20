@@ -111,7 +111,60 @@ const SKY_FRAG = /* glsl */ `
  * the light out of your own window, so UTC would be the wrong answer nearly everywhere.
  */
 export function systemTimeOfDay(now = new Date()) {
-  return (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400
+  const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600
+  const sun = sunHours(now)
+  // Polar day or night: no sunrise to anchor to, so the plain clock is the honest answer.
+  if (!sun) return hours / 24
+  // Re-anchor the clock so this place's sunrise lands on 0.25 and sunset on 0.75, which is
+  // what the sky treats as the horizon. Day and night are each stretched to fit their half.
+  let d = hours - sun.noon
+  d -= 24 * Math.round(d / 24)
+  const half = sun.half
+  if (Math.abs(d) <= half) return 0.5 + (0.25 * d) / half
+  const night = 12 - half
+  return d > 0 ? 0.75 + (0.25 * (d - half)) / night : (0.25 * (d + 12)) / night
+}
+
+/**
+ * Where the viewer is. Starts as a guess from the machine's time zone (15° of longitude per
+ * hour, mid-latitude) so the sky is plausible at once, and is replaced by the real position if
+ * the browser grants it. The position never leaves the machine; it is only used for the
+ * sunrise sum below.
+ */
+const LOCATION_KEY = 'botcrossing.location.v1'
+let place = { lat: 50, lon: -(new Date().getTimezoneOffset() / 60) * 15 }
+try {
+  const saved = JSON.parse(localStorage.getItem(LOCATION_KEY) || 'null')
+  if (saved && Number.isFinite(saved.lat) && Number.isFinite(saved.lon)) place = saved
+} catch {}
+
+/** Ask the browser where we are, once. Quietly keeps the time-zone guess if refused. */
+export function requestLocation() {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      place = { lat: pos.coords.latitude, lon: pos.coords.longitude }
+      try {
+        localStorage.setItem(LOCATION_KEY, JSON.stringify(place))
+      } catch {}
+    },
+    () => {},
+    { maximumAge: 24 * 3600 * 1000, timeout: 15000 }
+  )
+}
+
+/** Solar noon (local hours) and half the day's length (hours) here today, or null in polar day/night. */
+function sunHours(now) {
+  const rad = Math.PI / 180
+  const start = new Date(now.getFullYear(), 0, 0)
+  const n = Math.floor((now - start) / 86400000)
+  const decl = 23.44 * rad * Math.sin((2 * Math.PI * (284 + n)) / 365)
+  const cosH = (Math.sin(-0.833 * rad) - Math.sin(place.lat * rad) * Math.sin(decl)) / (Math.cos(place.lat * rad) * Math.cos(decl))
+  if (cosH >= 1 || cosH <= -1) return null
+  const B = (2 * Math.PI * (n - 81)) / 364
+  const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B) // minutes
+  const noon = 12 - place.lon / 15 - eot / 60 - now.getTimezoneOffset() / 60
+  return { noon, half: Math.acos(cosH) / rad / 15 }
 }
 
 export const TIMES = [
@@ -136,13 +189,15 @@ const SUN_AXIS = 0.72 // which way the sun tracks across the sky
  */
 const SUN_APEX = 0.95
 /** Half-width of the shadow camera, in metres, centred on whatever you are looking at. */
-const SHADOW_EXTENT = 30
+const SHADOW_EXTENT = 22
 /**
  * The focus is snapped to this grid before the shadow camera moves. Panning a shadow map
  * by sub-texel amounts makes every shadow edge crawl; snapping trades a little slack at
  * the frustum edge for edges that hold still.
  */
 const SHADOW_SNAP = 2
+/** One and a half shadow texels: enough to stop acne, small enough that sharper maps are not pushed off their casters. */
+const normalBiasFor = (size) => (1.5 * 2 * SHADOW_EXTENT) / size
 
 export class Sky {
   constructor(scene, settings, renderer) {
@@ -265,8 +320,8 @@ export class Sky {
     // decks; depth bias is left at zero because normal bias alone does the job without the
     // peter-panning that a negative depth bias causes on these small characters.
     this.sun.shadow.bias = 0
-    this.sun.shadow.normalBias = 0.09
     this.sun.shadow.mapSize.setScalar(this.settings.shadowSize || 1024)
+    this.sun.shadow.normalBias = normalBiasFor(this.settings.shadowSize || 1024)
     this.focus = new THREE.Vector3()
     this.sun.target.position.set(0, 0, 0)
     this.group.add(this.sun, this.sun.target)
@@ -513,6 +568,7 @@ export class Sky {
       this.sun.castShadow = size > 0
       if (size > 0) {
         this.sun.shadow.mapSize.setScalar(size)
+        this.sun.shadow.normalBias = normalBiasFor(size)
         this.sun.shadow.map?.dispose()
         this.sun.shadow.map = null
       }
