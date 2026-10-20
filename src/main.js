@@ -3,7 +3,7 @@ import './ui/styles.css'
 import { DEFAULT_PRESET, Settings, hasStoredSettings } from './core/settings.js'
 import { Engine } from './core/engine.js'
 import { CameraRig } from './core/camera.js'
-import { Colony, STATUS_LABEL, STATUS_ORDER, statusFor, transcriptProgress } from './game/colony.js'
+import { Colony, STATUS_LABEL, STATUS_ORDER, statusFor } from './game/colony.js'
 import { Hud } from './ui/hud.js'
 import { PLANETS } from './world/planet.js'
 import { DECK_TOP, PLOT_CELL, hexToWorld, worldToHex } from './world/plots.js'
@@ -294,7 +294,10 @@ const actions = {
   // those were the same number while construction was drawn by burying the structure.
   progressFor: (id) => {
     const thread = threads.find((t) => t.id === id)
-    return thread ? transcriptProgress(thread) : 0
+    if (!thread) return 0
+    // Stretched over 1 KB to ~30 MB so even a long session still has room to grow; the world's
+    // own building progress keeps its tighter scale.
+    return Math.min(0.97, Math.max(0.05, (Math.log10(Math.max(1, thread.sizeBytes || 0)) - 3) / 4.5))
   },
 }
 

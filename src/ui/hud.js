@@ -763,6 +763,16 @@ export class Hud {
     // Measured once per selection rather than per frame: placing the card beside its
     // astronaut needs its size sixty times a second, and asking the layout for it that
     // often is how a HUD starts costing frames.
+    // A bar only while somebody is actually working. It is an estimate — how far into a long
+    // conversation this one is, on a log scale — since nothing knows how big the task is, so no number.
+    const work = this.$('.thread-pop .work')
+    work.hidden = agent.status !== 'working'
+    if (!work.hidden) {
+      const pct = Math.round((this.actions.progressFor?.(thread.id) ?? 0) * 100)
+      const bar = work.querySelector('.progress > i')
+      bar.style.width = `${pct}%`
+      bar.style.background = hex(agent.trim.getHex())
+    }
     this._cardSize = { w: card.offsetWidth, h: card.offsetHeight }
     this.$('#btn-open').disabled = thread.canOpen === false
     // Only offered when there is something to dismiss. A third button on every card would
@@ -1191,6 +1201,7 @@ const TEMPLATE = `
       <div class="title"></div>
       <div class="summary"></div>
       <div class="meta"></div>
+      <div class="work" hidden><div class="progress"><i></i></div></div>
     </div>
     <button class="btn icon ghost" id="btn-follow" title="Follow selected bot" aria-label="Follow selected bot" aria-pressed="false">${ICON.locate}</button>
     <button class="btn icon ghost" id="btn-deselect" title="Deselect (Esc)">${ICON.close}</button>

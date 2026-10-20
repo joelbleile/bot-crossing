@@ -697,6 +697,29 @@ body {
   height: 34px;
 }
 
+.thread-pop .work {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.thread-pop .work[hidden] {
+  display: none;
+}
+
+.thread-pop .work .progress {
+  flex: 1;
+}
+
+.thread-pop .work .pct {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: right;
+}
+
 .progress {
   height: 5px;
   border-radius: 3px;
