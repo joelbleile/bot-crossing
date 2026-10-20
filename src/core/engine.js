@@ -88,6 +88,7 @@ export class Engine {
 
     this.composer = null
     this.bloomPass = null
+    this._msaa = settings.get('antialias') ? 4 : 0
     this.occlusionPass = null
     this.smaaPass = null
     this.tiltShift = null
@@ -162,6 +163,11 @@ export class Engine {
     this.camera.fov = s.get('fov')
     this.camera.updateProjectionMatrix()
 
+    // The sample count is fixed when a render target is made, so changing it means a new one.
+    const msaa = s.get('antialias') ? 4 : 0
+    if (this.composer && this._msaa !== msaa) this._disposeComposer()
+    this._msaa = msaa
+
     const wantsPost = this._wantsPost()
     if (wantsPost) this._ensureComposer()
     else this._disposeComposer()
@@ -198,7 +204,9 @@ export class Engine {
     const target = new THREE.WebGLRenderTarget(1, 1, {
       type: THREE.HalfFloatType, // HDR: values above 1 survive to the bloom pass
       colorSpace: THREE.LinearSRGBColorSpace,
-      samples: 0,
+      // Real multisampling on the scene itself: SMAA at the end of the chain only softens edges
+      // it can still see, and far-away rocks and thin robot limbs are exactly what it misses.
+      samples: this._msaa,
       depthBuffer: true,
       stencilBuffer: false,
       depthTexture,
@@ -521,7 +529,14 @@ const GRADE_SHADER = {
     varying vec2 vUv;
     void main() {
       vec4 c = texture2D( tDiffuse, vUv );
-      vec3 col = c.rgb;
+      // Unsharp mask: push each pixel away from its four neighbours' average. Clamped to the
+      // neighbourhood's own range so it adds crispness without halos around bright edges.
+      vec2 px = 1.0 / vec2( textureSize( tDiffuse, 0 ) );
+      vec3 n = texture2D( tDiffuse, vUv + vec2( px.x, 0.0 ) ).rgb + texture2D( tDiffuse, vUv - vec2( px.x, 0.0 ) ).rgb
+             + texture2D( tDiffuse, vUv + vec2( 0.0, px.y ) ).rgb + texture2D( tDiffuse, vUv - vec2( 0.0, px.y ) ).rgb;
+      vec3 lo = min( c.rgb, n * 0.25 );
+      vec3 hi = max( c.rgb, n * 0.25 );
+      vec3 col = clamp( c.rgb + ( c.rgb - n * 0.25 ) * 0.6, lo - 0.08, hi + 0.08 );
       // Lifted, tinted blacks.
       col += ( 1.0 - col ) * vec3( 0.035, 0.045, 0.075 ) * ( 1.0 - smoothstep( 0.0, 0.5, dot( col, vec3( 0.333 ) ) ) );
       float l = dot( col, vec3( 0.2126, 0.7152, 0.0722 ) );

@@ -67,18 +67,18 @@ export const PRESETS = {
     label: 'Balanced',
     hint: 'the default — looks good, runs cool',
     values: {
-      renderScale: 1,
-      shadows: 'low',
+      renderScale: 1.25,
+      shadows: 'high',
       bloom: true,
-      antialias: false,
+      antialias: true,
       particles: 'low',
-      textureQuality: 'medium',
+      textureQuality: 'high',
       scatterDensity: 0.6,
       groundDetail: 'medium',
       maxAgents: 90,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false,
       colorGrade: true,
       ambientOcclusion: 0.25,
       clouds: true,
@@ -100,7 +100,7 @@ export const PRESETS = {
       maxAgents: 140,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false,
       colorGrade: true,
       ambientOcclusion: 0.25,
       clouds: true,
@@ -122,7 +122,7 @@ export const PRESETS = {
       maxAgents: 200,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false,
       colorGrade: true,
       ambientOcclusion: 0.25,
       clouds: true,
@@ -147,7 +147,7 @@ const DEFAULTS = {
   ...PRESETS.balanced.values,
 
   // World
-  planet: 'moon',
+  planet: 'mars',
   /**
    * Fold away repos where every thread has been quiet for three days. On by default: with
    * several harnesses read at once the map otherwise fills with every checkout you have ever
@@ -155,16 +155,16 @@ const DEFAULTS = {
    * one click and a folded repo returns to the same ground the moment a thread wakes up.
    */
   hideDormant: true,
-  timeOfDay: 0.32, // 0..1 — 0 is midnight, 0.5 is noon
+  timeOfDay: 0.42, // 0..1 — 0 is midnight, 0.5 is noon; a higher sun gives shorter, crisper shadows
   autoTime: false,
   /** Sky follows this machine's own clock. Wins over `autoTime`; both off is manual. */
-  clockTime: false,
+  clockTime: true,
   dayLength: 240, // seconds for a full cycle when autoTime is on
 
   // Look
   exposure: 1.0,
   bloomStrength: 0.25,
-  tiltShiftStrength: 0.2, // 0..1 — share of the effect's full blur radius (2% of frame height)
+  tiltShiftStrength: 0.08, // 0..1 — share of the effect's full blur radius (2% of frame height)
   tiltShiftAngle: 0, // degrees — 0 keeps the sharp band horizontal
   iblIntensity: 1.0,
   fov: 38,
@@ -175,16 +175,17 @@ const DEFAULTS = {
    */
   worldCurve: 0.45,
   /** The colour grade on top of tone mapping: saturation, a warm cast, and a soft vignette. */
-  saturation: 1.0,
-  vignette: 0.3,
+  saturation: 1.15,
+  vignette: 0.2,
 
   // Sound. On by default but silent until the first click — browsers insist — and every
   // layer has its own fader, because the one thing an always-open window must never do is
   // make a noise you cannot turn down.
   sound: true,
   masterVolume: 0.6,
-  ambienceVolume: 0.8,
+  ambienceVolume: 0,
   effectsVolume: 0.8,
+  musicVolume: 0.5,
 
   // Behaviour
   autoQuality: true, // drop render scale when frames get expensive
@@ -194,6 +195,10 @@ const DEFAULTS = {
   followSelected: true, // track the selected bot while retaining manual camera controls
   /** Set once when the follow default flipped on, so the migration never runs twice. */
   followDefaultOn: false,
+  /** Same trick for the sky following the real clock, and for the ambience bed being silent. */
+  liveDefaultsOn: false,
+  marsDefaultOn: false,
+  sharpDefaultOn: false,
   showFps: false,
   showLabels: true,
   reducedMotion: false,
@@ -236,6 +241,23 @@ export class Settings {
     if (!Object.hasOwn(stored, 'followDefaultOn')) {
       this.values.followSelected = true
       this.values.followDefaultOn = true
+    }
+    if (!Object.hasOwn(stored, 'liveDefaultsOn')) {
+      this.values.clockTime = true
+      this.values.ambienceVolume = 0
+      this.values.planet = 'moon'
+      this.values.liveDefaultsOn = true
+    }
+    if (!Object.hasOwn(stored, 'marsDefaultOn')) {
+      this.values.planet = 'mars'
+      this.values.marsDefaultOn = true
+    }
+    // The sharper look: multisampling on, no depth blur, a supersampled buffer on Balanced.
+    if (!Object.hasOwn(stored, 'sharpDefaultOn')) {
+      this.values.antialias = true
+      this.values.tiltShift = false
+      if (this.values.preset === 'balanced') this.values.renderScale = 1.25
+      this.values.sharpDefaultOn = true
     }
     this.listeners = new Set()
     this._saveTimer = 0

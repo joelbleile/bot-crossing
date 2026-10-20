@@ -234,8 +234,17 @@ async function fakeClaudeWithErrands(errandRecords) {
 
 async function claudeWithErrands(home) {
   process.env.HOME = home
+  // os.homedir() reads USERPROFILE on Windows, not HOME.
+  process.env.USERPROFILE = home
   const mod = await import(`../server/harnesses/claude-code.mjs?${home}`)
   return mod.default
+}
+
+const REAL_USERPROFILE = process.env.USERPROFILE
+function restoreHome(realHome) {
+  process.env.HOME = realHome
+  if (REAL_USERPROFILE === undefined) delete process.env.USERPROFILE
+  else process.env.USERPROFILE = REAL_USERPROFILE
 }
 
 const midTurn = { type: 'assistant', message: { content: [{ type: 'tool_use' }], stop_reason: 'tool_use' } }
@@ -251,7 +260,7 @@ test('a running subagent is reported with the brief it was given, however long t
   assert.equal(thread.subagents?.length, 1)
   assert.equal(thread.subagents[0].id, 'agent-abc')
   assert.match(thread.subagents[0].task, /^repair the raster pipeline/)
-  process.env.HOME = realHome
+  restoreHome(realHome)
   await fsp.rm(home, { recursive: true, force: true })
 })
 
@@ -264,7 +273,7 @@ test('a subagent that has handed its answer back is finished, however recently i
   const h = await claudeWithErrands(home)
   const [thread] = await h.scanThreads()
   assert.equal(thread.subagents, undefined, 'a finished errand is not an astronaut on the map')
-  process.env.HOME = realHome
+  restoreHome(realHome)
   await fsp.rm(home, { recursive: true, force: true })
 })
 

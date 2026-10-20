@@ -270,6 +270,8 @@ const viaOf = (body) => (body?.via === 'terminal' ? 'terminal' : 'app')
  * still sends the astronaut home, because the scan reads that flag; archiving here is the
  * colony's own business. Nothing outside `data/colony.json` is ever written.
  */
+const RETURN_AFTER_MS = 60_000
+
 async function reconcileArchived(threads) {
   const state = await readState()
   if (!state.archived.length) return threads
@@ -286,6 +288,9 @@ async function reconcileArchived(threads) {
    * asks whether a string it already holds appears among them.
    */
   const archived = (thread) => {
+    // A thread that has moved on since it was archived is back at work, so it comes back too.
+    const at = state.archivedAt[thread.id]
+    if (at && thread.lastActivityAt > at + RETURN_AFTER_MS) return false
     if (wanted.has(thread.id)) return true
     const ref = thread.ref
     if (!ref || typeof ref !== 'object') return false

@@ -38,9 +38,9 @@ const TABLE = {
   'autumn-rustle': { kind: 'bed', gain: 1 },
   'cherry-breeze': { kind: 'bed', gain: 1 },
   /** Airless worlds: the inside of a helmet rather than wind. Nearly inaudible on purpose. */
-  'lunar-silence': { kind: 'bed', gain: 1 },
+  'lunar-silence': { kind: 'bed', gain: 0 },
   /** Thin, high and dusty — a tenth of an atmosphere does not carry a low rumble. */
-  'mars-wind': { kind: 'bed', gain: 1 },
+  'mars-wind': { kind: 'bed', gain: 0.4 },
   'stream': { kind: 'bed', gain: 1 },
 
   // One-shots — environment events, and the handful of sounds the colony itself makes.
@@ -50,7 +50,7 @@ const TABLE = {
   'songbird': { kind: 'event', gain: 0.8 },
   'owl': { kind: 'event', gain: 0.8 },
   'thunder-distant': { kind: 'event', gain: 0.9 },
-  'wind-gust': { kind: 'event', gain: 0.7 },
+  'wind-gust': { kind: 'event', gain: 0.3 },
   'wave-crash': { kind: 'event', gain: 0.8 },
   'fish-splash': { kind: 'event', gain: 0.6 },
   'geyser': { kind: 'event', gain: 0.8 },
@@ -80,9 +80,9 @@ const TABLE = {
 
   // Positional loops — attached to things in the world, heard from where they are.
   'work-hammer': { kind: 'loop', gain: 1 },
-  'ship-hum': { kind: 'loop', gain: 1 },
-  'drone-whine': { kind: 'loop', gain: 1 },
-  'shore-lap': { kind: 'loop', gain: 1 },
+  'ship-hum': { kind: 'loop', gain: 0 },
+  'drone-whine': { kind: 'loop', gain: 0 },
+  'shore-lap': { kind: 'loop', gain: 0.4 },
 }
 
 /** name → { kind, gain, synth(ctx, dest, opts, noise) → Voice } */

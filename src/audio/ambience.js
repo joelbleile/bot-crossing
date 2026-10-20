@@ -1,5 +1,6 @@
 import { SOUNDS } from './sounds.js'
 import { createNoiseBuffers, SampleVoice } from './synth.js'
+import { Music } from './music.js'
 
 /**
  * The colony's sound, built on the Web Audio API and nothing else.
@@ -48,6 +49,8 @@ const SWAP_FADE = 1.5
 const RING = [10, 24]
 const PANNER = { panningModel: 'equalpower', distanceModel: 'inverse', refDistance: 7, rolloffFactor: 1.15, maxDistance: 300 }
 
+/** The tune sits well under the world; the slider's full travel is a quiet-to-moderate range. */
+const MUSIC_TRIM = 0.5
 const EMPTY = Object.freeze([])
 const NO_WORLD = Object.freeze({ night: 0, sources: EMPTY, water: null })
 const HALF_PI = Math.PI / 2
@@ -65,6 +68,8 @@ export class Ambience {
     this.compressor = null
     this.ambienceBus = null
     this.effectsBus = null
+    this.musicBus = null
+    this.music = null
 
     this._enabled = this._flag('sound', true)
     this._visible = typeof document === 'undefined' ? true : !document.hidden
@@ -334,6 +339,8 @@ export class Ambience {
       document.removeEventListener('visibilitychange', this._onVisibility)
       this._onVisibility = null
     }
+    this.music?.dispose()
+    this.music = null
     if (this.ctx) {
       this._stopEverything()
       try {
@@ -361,7 +368,7 @@ export class Ambience {
 
   _onSettings(changed) {
     if (changed.has('sound')) this.setEnabled(this._flag('sound', true))
-    if (changed.has('masterVolume') || changed.has('ambienceVolume') || changed.has('effectsVolume')) this._applyVolumes()
+    if (changed.has('masterVolume') || changed.has('ambienceVolume') || changed.has('effectsVolume') || changed.has('musicVolume')) this._applyVolumes()
   }
 
   _buildMixer() {
@@ -396,6 +403,12 @@ export class Ambience {
     this.master = master
     this.ambienceBus = ambienceBus
     this.effectsBus = effectsBus
+
+    const musicBus = ctx.createGain()
+    musicBus.gain.value = this._vol('musicVolume', 0.5) * MUSIC_TRIM
+    musicBus.connect(master)
+    this.musicBus = musicBus
+    this.music = new Music(ctx, musicBus)
   }
 
   _applyMute() {
@@ -410,6 +423,7 @@ export class Ambience {
     this.master.gain.setTargetAtTime(this._vol('masterVolume', 0.6), now, 0.05)
     this.ambienceBus.gain.setTargetAtTime(this._vol('ambienceVolume', 0.8), now, 0.05)
     this.effectsBus.gain.setTargetAtTime(this._vol('effectsVolume', 0.8), now, 0.05)
+    this.musicBus?.gain.setTargetAtTime(this._vol('musicVolume', 0.5) * MUSIC_TRIM, now, 0.05)
   }
 
   _wake() {

@@ -10,7 +10,7 @@ import { DECK_TOP, PLOT_CELL, hexToWorld, worldToHex } from './world/plots.js'
 import { planMove } from './world/plot-move.js'
 import { loadKit } from './world/kit.js'
 import { crewRig, loadCrew } from './agents/crew.js'
-import { TIMES } from './world/sky.js'
+import { TIMES, requestLocation } from './world/sky.js'
 import { CURVE_FULL, bendPoint, installWorldCurve, setCurveView } from './core/curve.js'
 import { Ambience } from './audio/ambience.js'
 import { shorelinePoints } from './world/planet.js'
@@ -48,6 +48,8 @@ app.insertAdjacentHTML(
 )
 
 const settings = new Settings()
+// Sunrise and sunset follow where you are; the browser asks once and the answer stays on this machine.
+if (settings.get('clockTime')) requestLocation()
 // A phone gets the light preset the first time: a retina panel at full scale with bloom
 // and shadows is more than its GPU wants to do at sixty, and the governor only ever finds
 // that out by stuttering first.
@@ -919,7 +921,14 @@ function applyThreads(list) {
     return at && t.lastActivityAt <= at ? { ...t, unread: false } : t
   })
   list = threads
-  const archivedSet = new Set(state.archived)
+  // Same rule as the server's: a thread active since it was archived has come back to work.
+  const archivedSet = new Set(
+    state.archived.filter((id) => {
+      const t = list.find((x) => x.id === id)
+      const at = state.archivedAt?.[id]
+      return !(t && at && t.lastActivityAt > at + 60_000)
+    })
+  )
   const hiddenSet = new Set(state.hiddenProjects || [])
 
   // Which threads the colony has met before. Walking out of the ship is meant to *mean*
